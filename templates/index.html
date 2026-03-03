@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>GNN 金融誠信監測系統</title>
+    <style>
+        body { font-family: 'Microsoft JhengHei', sans-serif; text-align: center; background: #f4f7f6; }
+        .container { max-width: 900px; margin: 50px auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        input { padding: 10px; width: 250px; border-radius: 5px; border: 1px solid #ddd; }
+        button { padding: 10px 20px; background: #d32f2f; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        .report-box { margin-top: 30px; padding: 20px; border: 2px solid #ffcdd2; background: #fff9f9; border-radius: 10px; text-align: left; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>GNN 金融誠信異常偵測系統</h1>
+        <form method="POST">
+            <input type="text" name="symbol" placeholder="輸入台股代號 (股號.TW/.TWO)" required>
+            <button type="submit">啟動 AI 診斷</button>
+        </form>
+        
+
+        {% if plot_url %}
+            <h2 style="margin-top:40px;">供應鏈風險圖譜</h2>
+            <img src="data:image/png;base64,{{ plot_url }}" width="100%">
+            
+            <div class="report-box">
+                <h3>🔍 AI 自動化診斷報告</h3>
+                <p>{{ report }}</p>
+            </div>
+        {% endif %}
+    </div>
+</body>
+<script>
+    document.querySelector('form').onsubmit = function() {
+        const btn = document.querySelector('button');
+        btn.disabled = true;
+        btn.innerText = 'AI 核心診斷中，請稍候...';
+        btn.style.background = '#999';
+    };
+</script>
+
+</html>
+
