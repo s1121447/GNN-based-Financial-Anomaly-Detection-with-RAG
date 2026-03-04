@@ -4,41 +4,68 @@
     <meta charset="UTF-8">
     <title>GNN 金融誠信監測系統</title>
     <style>
-        body { font-family: 'Microsoft JhengHei', sans-serif; text-align: center; background: #f4f7f6; }
-        .container { max-width: 900px; margin: 50px auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        input { padding: 10px; width: 250px; border-radius: 5px; border: 1px solid #ddd; }
-        button { padding: 10px 20px; background: #d32f2f; color: white; border: none; border-radius: 5px; cursor: pointer; }
-        .report-box { margin-top: 30px; padding: 20px; border: 2px solid #ffcdd2; background: #fff9f9; border-radius: 10px; text-align: left; }
+        body { font-family: 'Microsoft JhengHei', sans-serif; text-align: center; background: #f4f7f6; padding-bottom: 50px; }
+        .container { max-width: 1000px; margin: 50px auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        input { padding: 12px; width: 250px; border-radius: 5px; border: 1px solid #ddd; font-size: 16px; }
+        button#main-btn { padding: 12px 25px; background: #d32f2f; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; }
+        .report-box { margin-top: 30px; padding: 25px; border-left: 5px solid #d32f2f; background: #fff9f9; border-radius: 5px; text-align: left; }
+        .node-btn { margin: 5px; padding: 8px 15px; background: white; border: 1px solid #d32f2f; color: #d32f2f; border-radius: 20px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        .node-btn:hover { background: #d32f2f; color: white; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>GNN 金融誠信異常偵測系統</h1>
+        <h1>GNN 金融供應鏈異常偵測系統</h1>
         <form method="POST">
-            <input type="text" name="symbol" placeholder="輸入台股代號 (股號.TW/.TWO)" required>
-            <button type="submit">啟動 AI 診斷</button>
+            <input type="text" name="symbol" placeholder="輸入台股代號 (如 2330)" required>
+            <button type="submit" id="main-btn">啟動群體異常診斷</button>
         </form>
-        
 
         {% if plot_url %}
-            <h2 style="margin-top:40px;">供應鏈風險圖譜</h2>
-            <img src="data:image/png;base64,{{ plot_url }}" width="100%">
+            <h2 style="margin-top:40px;">供應鏈風險圖譜 (離群偵測模式)</h2>
+            <img src="data:image/png;base64,{{ plot_url }}" width="100%" style="border-radius: 10px; border: 1px solid #eee;">
             
-            <div class="report-box">
-                <h3>🔍 AI 自動化診斷報告</h3>
-                <p>{{ report }}</p>
+            <div style="margin-top: 20px;">
+                <p><strong>點擊下方公司標籤，獲取個別 AI 診斷報告：</strong></p>
+                {% for symbol, name in stocks_info %}
+                    <button class="node-btn" onclick="fetchIndividualReport('{{ symbol }}', '{{ name }}')">
+                        {{ name }}
+                    </button>
+                {% endfor %}
+            </div>
+
+            <div class="report-box" id="ai-report-container">
+                <h3 id="report-title">🔍 AI 自動化診斷報告：群體最異常項目</h3>
+                <p id="report-content">{{ report }}</p>
             </div>
         {% endif %}
     </div>
+
+    <script>
+        // 防止重複送出
+        document.querySelector('form').onsubmit = function() {
+            const btn = document.getElementById('main-btn');
+            btn.disabled = true;
+            btn.innerText = '正在聚合群體特徵...';
+        };
+
+        // 異步獲取個別股票報告
+        function fetchIndividualReport(symbol, name) {
+            const content = document.getElementById('report-content');
+            const title = document.getElementById('report-title');
+            
+            content.innerText = "正在為 " + name + " (" + symbol + ") 生成深度診斷報告，請稍候...";
+            title.innerText = "🔍 深度分析個體：" + name;
+
+            fetch('/analyze_individual/' + symbol)
+                .then(response => response.json())
+                .then(data => {
+                    content.innerText = data.report;
+                })
+                .catch(error => {
+                    content.innerText = "分析失敗，可能因 API 額度限制。";
+                });
+        }
+    </script>
 </body>
-<script>
-    document.querySelector('form').onsubmit = function() {
-        const btn = document.querySelector('button');
-        btn.disabled = true;
-        btn.innerText = 'AI 核心診斷中，請稍候...';
-        btn.style.background = '#999';
-    };
-</script>
-
 </html>
-
