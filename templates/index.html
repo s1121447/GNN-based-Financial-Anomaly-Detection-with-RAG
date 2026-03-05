@@ -2,15 +2,18 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>GNN 金融誠信監測系統</title>
+    <title>GNN 金融供應鏈監測系統</title>
     <style>
         body { font-family: 'Microsoft JhengHei', sans-serif; text-align: center; background: #f4f7f6; padding-bottom: 50px; }
         .container { max-width: 1000px; margin: 50px auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
         input { padding: 12px; width: 250px; border-radius: 5px; border: 1px solid #ddd; font-size: 16px; }
         button#main-btn { padding: 12px 25px; background: #d32f2f; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; }
-        .report-box { margin-top: 30px; padding: 25px; border-left: 5px solid #d32f2f; background: #fff9f9; border-radius: 5px; text-align: left; }
+        .report-box { margin-top: 30px; padding: 25px; border-left: 5px solid #d32f2f; background: #fff9f9; border-radius: 10px; text-align: left; }
+        /* 節點按鈕樣式 */
         .node-btn { margin: 5px; padding: 8px 15px; background: white; border: 1px solid #d32f2f; color: #d32f2f; border-radius: 20px; cursor: pointer; font-weight: bold; transition: 0.3s; }
-        .node-btn:hover { background: #d32f2f; color: white; }
+        .node-btn:hover:not(:disabled) { background: #d32f2f; color: white; }
+        /* 禁用狀態樣式 (冷卻中) */
+        .node-btn:disabled { border: 1px solid #ccc; color: #999; cursor: not-allowed; background: #eee; }
     </style>
 </head>
 <body>
@@ -26,9 +29,9 @@
             <img src="data:image/png;base64,{{ plot_url }}" width="100%" style="border-radius: 10px; border: 1px solid #eee;">
             
             <div style="margin-top: 20px;">
-                <p><strong>點擊下方公司標籤，獲取個別 AI 診斷報告：</strong></p>
+                <p><strong>點擊下方公司標籤，獲取個別 AI 診斷報告 (每 12 秒限一次)：</strong></p>
                 {% for symbol, name in stocks_info %}
-                    <button class="node-btn" onclick="fetchIndividualReport('{{ symbol }}', '{{ name }}')">
+                    <button class="node-btn" onclick="fetchIndividualReport('{{ symbol }}', '{{ name }}', this)">
                         {{ name }}
                     </button>
                 {% endfor %}
@@ -42,28 +45,45 @@
     </div>
 
     <script>
-        // 防止重複送出
+        // 防止主表單重複送出
         document.querySelector('form').onsubmit = function() {
             const btn = document.getElementById('main-btn');
             btn.disabled = true;
-            btn.innerText = '正在聚合群體特徵...';
+            btn.innerText = '正在聚合群體特徵並繪製圖譜...';
         };
 
-        // 異步獲取個別股票報告
-        function fetchIndividualReport(symbol, name) {
+        // 異步獲取個別股票報告 (帶有冷卻計時器)
+        // --- 修正後的 JS 呼叫邏輯 ---
+        function fetchIndividualReport(symbol, name, btnElement) {
             const content = document.getElementById('report-content');
             const title = document.getElementById('report-title');
+            const allBtns = document.querySelectorAll('.node-btn');
             
-            content.innerText = "正在為 " + name + " (" + symbol + ") 生成深度診斷報告，請稍候...";
+            content.innerText = "正在為 " + name + " (" + symbol + ") 生成深度診斷報告...";
             title.innerText = "🔍 深度分析個體：" + name;
 
-            fetch('/analyze_individual/' + symbol)
+            allBtns.forEach(b => b.disabled = true);
+            
+            let timeLeft = 12;
+            const originalText = btnElement.innerText;
+            const timer = setInterval(() => {
+                btnElement.innerText = `${originalText} (${timeLeft}s)`;
+                timeLeft--;
+                if (timeLeft < 0) {
+                    clearInterval(timer);
+                    btnElement.innerText = originalText;
+                    allBtns.forEach(b => b.disabled = false);
+                }
+            }, 1000);
+
+            // 關鍵修改：在 URL 後面帶上 ?name=名稱
+            fetch('/analyze_individual/' + symbol + '?name=' + encodeURIComponent(name))
                 .then(response => response.json())
                 .then(data => {
                     content.innerText = data.report;
                 })
                 .catch(error => {
-                    content.innerText = "分析失敗，可能因 API 額度限制。";
+                    content.innerText = "分析失敗，原因：" + error.message;
                 });
         }
     </script>
