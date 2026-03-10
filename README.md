@@ -37,6 +37,10 @@
 - 顯示節點異常程度
 - 顯示 AI 自動化分析報告
 
+目前以 Logistic Regression 作為 baseline，僅使用節點表格特徵，不考慮圖結構。結果顯示 baseline 雖然達到 92.37% 的 accuracy，但對異常類別完全無法辨識（Precision / Recall / F1 皆為 0）。
+
+GAT 模型的驗證 accuracy 為 92.68%，在異常類別上已經比 baseline 略有改善（Precision = 1.0000, Recall = 0.0123, F1 = 0.0244），顯示圖結構對異常辨識具有一定幫助。然而，目前模型仍高度偏向預測正常類別，反映出資料集中類別不平衡問題仍然非常明顯。
+
 | Model               | Accuracy | Precision (Anomaly) | Recall (Anomaly) | F1 (Anomaly) | Observation            |
 | ------------------- | -------: | ------------------: | ---------------: | -----------: | ---------------------- |
 | Logistic Regression |   0.9237 |              0.0000 |           0.0000 |       0.0000 | 完全抓不到異常                |
