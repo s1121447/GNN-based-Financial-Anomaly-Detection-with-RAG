@@ -1,0 +1,112 @@
+{
+  "target_symbol": "2317.TW",
+  "nodes": [
+    {
+      "symbol": "2317.TW",
+      "name": "鴻海",
+      "role": "目標"
+    },
+    {
+      "symbol": "2330.TW",
+      "name": "台積電",
+      "role": "上游"
+    },
+    {
+      "symbol": "2454.TW",
+      "name": "聯發科",
+      "role": "上游"
+    },
+    {
+      "symbol": "4958.TW",
+      "name": "臻鼎-KY",
+      "role": "上游"
+    },
+    {
+      "symbol": "2354.TW",
+      "name": "鴻準",
+      "role": "上游"
+    },
+    {
+      "symbol": "3481.TW",
+      "name": "群創",
+      "role": "上游"
+    },
+    {
+      "symbol": "2327.TW",
+      "name": "國巨",
+      "role": "上游"
+    },
+    {
+      "symbol": "2392.TW",
+      "name": "正崴",
+      "role": "上游"
+    },
+    {
+      "symbol": "3008.TW",
+      "name": "大立光",
+      "role": "上游"
+    },
+    {
+      "symbol": "3037.TW",
+      "name": "欣興",
+      "role": "上游"
+    },
+    {
+      "symbol": "2258.TW",
+      "name": "鴻華先進-創",
+      "role": "下游"
+    }
+  ],
+  "edges": [
+    {
+      "source": "2330.TW",
+      "target": "2317.TW",
+      "relation": "上游供應"
+    },
+    {
+      "source": "2454.TW",
+      "target": "2317.TW",
+      "relation": "上游供應"
+    },
+    {
+      "source": "4958.TW",
+      "target": "2317.TW",
+      "relation": "上游供應"
+    },
+    {
+      "source": "2354.TW",
+      "target": "2317.TW",
+      "relation": "上游供應"
+    },
+    {
+      "source": "3481.TW",
+      "target": "2317.TW",
+      "relation": "上游供應"
+    },
+    {
+      "source": "2327.TW",
+      "target": "2317.TW",
+      "relation": "上游供應"
+    },
+    {
+      "source": "2392.TW",
+      "target": "2317.TW",
+      "relation": "上游供應"
+    },
+    {
+      "source": "3008.TW",
+      "target": "2317.TW",
+      "relation": "上游供應"
+    },
+    {
+      "source": "3037.TW",
+      "target": "2317.TW",
+      "relation": "上游供應"
+    },
+    {
+      "source": "2317.TW",
+      "target": "2258.TW",
+      "relation": "下游需求"
+    }
+  ]
+}

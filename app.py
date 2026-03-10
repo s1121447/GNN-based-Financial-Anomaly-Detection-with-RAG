@@ -1,251 +1,209 @@
 import os
 import io
 import base64
-import torch
-import torch.nn.functional as F
-from torch_geometric.nn import GATConv
-from torch_geometric.data import Data
-import yfinance as yf
-import networkx as nx
-import pandas as pd
-import numpy as np
+import time
 import matplotlib
-matplotlib.use('Agg') 
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import networkx as nx
 from flask import Flask, render_template, request, jsonify
-from google import genai
 from dotenv import load_dotenv
+from google import genai
+
+from inference import run_inference
+from config import GEMINI_MODEL
 
 load_dotenv()
-os.environ["PYTHONUTF8"] = "1"
-app = Flask(__name__) 
+app = Flask(__name__)
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
-plt.rcParams['font.sans-serif'] = ['Microsoft JhengHei'] 
-plt.rcParams['axes.unicode_minus'] = False 
+plt.rcParams["font.sans-serif"] = ["Microsoft JhengHei"]
+plt.rcParams["axes.unicode_minus"] = False
 
-class FinancialGAT(torch.nn.Module):
-    def __init__(self, in_channels):
-        super().__init__()
-        self.conv1 = GATConv(in_channels, 16, heads=4)
-        self.conv2 = GATConv(64, 1)
-    def forward(self, data):
-        x, edge_index = data.x, data.edge_index
-        x = F.elu(self.conv1(x, edge_index))
-        return self.conv2(x, edge_index)
 
-def discover_stocks(target_symbol):
-    print(f">>>> [1/4] 正在利用 AI 分析供應鏈角色...")
-    # 修正重點：強制要求「台股代號」與「正確後綴」
-    prompt = (
-        f"分析台股「{target_symbol}」的供應鏈，找尋最相關的 10 個「台灣上市櫃公司」。"
-        "【精確度要求】：請務必確認代號正確性（例如：盟立應為 2464.TW 而非 2497.TW）。"
-        "必須提供台股代號（.TW 或 .TWO）。"
-        f"格式範例：{target_symbol}:名稱:目標, 2330.TW:台積電:上游, 3680.TWO:家登:下游。\n"
-        "僅回傳格式字串。"
+def build_plot_url(infer_result):
+    raw_symbols = infer_result["raw_symbols"]
+    raw_names = infer_result["raw_names"]
+    raw_roles = infer_result["raw_roles"]
+    edge_meta = infer_result["edge_meta"]
+
+    score_map = {(n["symbol"], n["name"]): n["score"] for n in infer_result["nodes"]}
+
+    G = nx.DiGraph()
+    for i, (symbol, name, role) in enumerate(zip(raw_symbols, raw_names, raw_roles)):
+        score = score_map[(symbol, name)]
+        G.add_node(i, symbol=symbol, name=name, role=role, score=score, label=f"{name}\n({symbol})")
+
+    symbol_to_idx = {s: i for i, s in enumerate(raw_symbols)}
+    for e in edge_meta:
+        if e["source"] in symbol_to_idx and e["target"] in symbol_to_idx:
+            G.add_edge(
+                symbol_to_idx[e["source"]],
+                symbol_to_idx[e["target"]],
+                weight=e["corr"]
+            )
+
+    fig, ax = plt.subplots(figsize=(16, 12))
+
+    target_idx = next((i for i, role in enumerate(raw_roles) if role == "目標"), None)
+    pos = {}
+    upstream = [i for i, role in enumerate(raw_roles) if role == "上游"]
+    downstream = [i for i, role in enumerate(raw_roles) if role == "下游"]
+    others = [i for i, role in enumerate(raw_roles) if role == "其他"]
+
+    max_y = 0.0
+    if target_idx is not None:
+        pos[target_idx] = (0.0, 0.0)
+
+    for idx, u in enumerate(upstream):
+        y = ((len(upstream)-1-idx) - len(upstream)/2.0 + 0.5) * 2.8
+        pos[u] = (-1.8, y)
+        max_y = max(max_y, abs(y))
+
+    for idx, d in enumerate(downstream):
+        y = ((len(downstream)-1-idx) - len(downstream)/2.0 + 0.5) * 2.8
+        pos[d] = (1.8, y)
+        max_y = max(max_y, abs(y))
+
+    for idx, o in enumerate(others):
+        y = ((len(others)-1-idx) - len(others)/2.0 + 0.5) * 2.4 + 4.0
+        pos[o] = (0.0, y)
+        max_y = max(max_y, abs(y))
+
+    if max_y < 3:
+        max_y = 3
+
+    remaining = list(G.nodes())
+    node_colors = [G.nodes[i]["score"] for i in remaining]
+
+    nodes = nx.draw_networkx_nodes(
+        G, pos,
+        nodelist=remaining,
+        node_color=node_colors,
+        cmap=plt.cm.Reds,
+        node_size=4200,
+        alpha=0.92,
+        vmin=0.0,
+        vmax=1.0,
+        ax=ax
     )
-    try:
-        response = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
-        text = response.text.strip()
-        raw_items = text.replace('\n', ',').split(',')
-        stocks, names, roles = [], [], []
-        for item in raw_items:
-            if item.count(':') == 2:
-                s, n, r = item.split(':')
-                # 確保大寫並處理可能的空白
-                stocks.append(s.strip().upper()); names.append(n.strip()); roles.append(r.strip())
-        return stocks, names, roles
-    except Exception as e:
-        print(f"AI 分析出錯: {e}")
-        return [target_symbol], ["目標股"], ["目標"]
 
-def run_gnn_full_analysis(stocks, names):
-    print(f">>>> [2/4] 正在執行數據抓取與精確對齊...")
-    price_series_list, success_data = [], []
+    if len(G.edges()) > 0:
+        widths = [max(1.0, abs(G[u][v]["weight"]) * 10) for u, v in G.edges()]
+        nx.draw_networkx_edges(
+            G, pos,
+            edgelist=list(G.edges()),
+            width=widths,
+            alpha=0.35,
+            edge_color="#888888",
+            arrows=True,
+            arrowsize=25,
+            ax=ax
+        )
 
-    for i, s in enumerate(stocks):
-        df = None
-        current_symbol = s if "." in s else f"{s}.TW"
-        
-        try:
-            df = yf.download(current_symbol, period="3mo", progress=False)
-            if (df is None or df.empty or len(df) < 5):
-                alt_s = current_symbol[:-3] + ".TWO" if current_symbol.endswith(".TW") else current_symbol[:-4] + ".TW"
-                print(f"嘗試修正代號: {current_symbol} -> {alt_s}")
-                df = yf.download(alt_s, period="3mo", progress=False)
-                if not df.empty and len(df) >= 5:
-                    current_symbol = alt_s
-        except Exception as e:
-            print(f"下載 {current_symbol} 出錯: {e}")
-            continue
+        edge_labels = {(u, v): f"{G[u][v]['weight']:.2f}" for u, v in G.edges()}
+        nx.draw_networkx_edge_labels(
+            G, pos,
+            edge_labels=edge_labels,
+            font_size=9,
+            font_color="#666666",
+            ax=ax
+        )
 
-        if df is None or df.empty or len(df) < 5:
-            continue
+    labels = {i: G.nodes[i]["label"] for i in G.nodes()}
+    nx.draw_networkx_labels(
+        G, pos,
+        labels=labels,
+        font_family="Microsoft JhengHei",
+        font_weight="bold",
+        font_size=10,
+        ax=ax
+    )
 
-        try:
-            if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
-            pct_change = df['Close'].pct_change().dropna()
-            if pct_change.empty: continue
-            
-            pct_series = pct_change.iloc[:, 0] if len(pct_change.shape) > 1 else pct_change
-            pct_series.name = names[i]
-            price_series_list.append(pct_series)
-            
-            p_change = (float(df['Close'].iloc[-1]) - float(df['Close'].iloc[-2])) / float(df['Close'].iloc[-2])
-            v_change = (float(df['Volume'].iloc[-1]) - float(df['Volume'].iloc[-2])) / float(df['Volume'].iloc[-2]) if float(df['Volume'].iloc[-2]) != 0 else 0
-            
-            success_data.append({'name': names[i], 'symbol': current_symbol, 'features': [p_change, v_change, 0.5]})
-        except: continue
-
-    if len(price_series_list) < 2: return None, None, None, None, None
-
-    combined_df = pd.concat(price_series_list, axis=1, join='outer').fillna(0)
-    corr_matrix = combined_df.corr().fillna(0)
-    
-    final_v_names, final_v_symbols, final_features = [], [], []
-    for item in success_data:
-        if item['name'] in corr_matrix.columns:
-            final_v_names.append(item['name']); final_v_symbols.append(item['symbol']); final_features.append(item['features'])
-    
-    p_changes = torch.tensor([f[0] for f in final_features])
-    mean_p = torch.mean(p_changes) 
-    scores = torch.abs(p_changes - mean_p) * 20 
-    scores = torch.clamp(scores, max=1.0)
-    
-    return final_v_names, final_v_symbols, scores, final_features, corr_matrix
-
-def get_plot_url(v_names, v_symbols, scores, v_roles, corr_matrix):
-    print(f">>>> [3/4] 正在繪製視覺優化後的風險圖譜...")
-    plt.clf(); fig, ax = plt.subplots(figsize=(16, 13)); G = nx.DiGraph()
-
-    # 1. 建立節點
-    for i, name in enumerate(v_names): 
-        G.add_node(i, label=f"{name}\n({v_symbols[i]})", role=v_roles[i])
-    
-    # 2. 保底邏輯：如果沒人標記為「目標」，則設定第一個節點為中心
-    target_idx = next((i for i, r in enumerate(v_roles) if "目標" in r or "核心" in r), 0)
-
-    # 3. 建立連線 (只要角色關鍵字對上就連線)
-    for i in range(len(v_names)):
-        for j in range(len(v_names)):
-            if i == j: continue
-            # 模糊比對角色關鍵字
-            is_u_to_t = ("上游" in v_roles[i]) and ("目標" in v_roles[j] or "核心" in v_roles[j])
-            is_t_to_d = ("目標" in v_roles[i] or "核心" in v_roles[i]) and ("下游" in v_roles[j])
-            
-            if is_u_to_t or is_t_to_d:
-                if v_names[i] in corr_matrix.index and v_names[j] in corr_matrix.columns:
-                    w = corr_matrix.loc[v_names[i], v_names[j]]
-                    if w > 0.05: G.add_edge(i, j, weight=w)
-
-    # 4. 佈局計算
-    remaining = sorted(list(G.nodes()))
-    u_idx = [i for i in remaining if "上游" in v_roles[i]]
-    d_idx = [i for i in remaining if "下游" in v_roles[i]]
-    
-    pos = {target_idx: (0, 0)} if target_idx is not None else {}
-    max_y = 0
-    # 確保座標計算不會噴錯
-    for idx, u in enumerate(u_idx):
-        y = ((len(u_idx)-1-idx)-len(u_idx)/2.0+0.5)*3.0; pos[u] = (-1.5, y); max_y = max(max_y, abs(y))
-    for idx, d in enumerate(d_idx):
-        y = ((len(d_idx)-1-idx)-len(d_idx)/2.0+0.5)*3.0; pos[d] = (1.5, y); max_y = max(max_y, abs(y))
-
-    # 5. 繪圖
-    node_colors = [scores[i].item() for i in remaining]
-    nodes = nx.draw_networkx_nodes(G, pos, node_color=node_colors, cmap=plt.cm.Reds, node_size=4500, alpha=0.9, vmin=0.0, vmax=1.0)
-    
-    if G.edges():
-        nx.draw_networkx_edges(G, pos, edgelist=G.edges(), width=[max(1.0, G[u][v]['weight']*15) for u,v in G.edges()], alpha=0.3, edge_color='#888', arrows=True, arrowsize=30)
-    
-    edge_labels = {(u, v): f"{G[u][v]['weight']:.2f}" for u, v in G.edges()}
-    nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=10, font_color='#555')
-    
-    nx.draw_networkx_labels(G, pos, labels=nx.get_node_attributes(G, 'label'), font_family='Microsoft JhengHei', font_weight='bold', font_size=11)
-    
     title_y = max_y + 1.8
-    ax.text(-1.5, title_y, "【上游供應】\n(偏差風險)", fontsize=14, ha='center', fontweight='bold')
-    ax.text(0.0, title_y, "【核心目標】", fontsize=14, ha='center', fontweight='bold', color='red')
-    ax.text(1.5, title_y, "【下游需求】\n(偏差風險)", fontsize=14, ha='center', fontweight='bold')
-    
-    plt.colorbar(nodes, ax=ax, fraction=0.03, pad=0.04, label='異常離群指數')
-    ax.set_ylim(-title_y-1, title_y+1)
-    plt.axis('off')
-    plt.title(f"供應鏈聯動分析圖譜", fontsize=20, pad=50)
-    
-    buf = io.BytesIO(); plt.savefig(buf, format='png', bbox_inches='tight', dpi=100); buf.seek(0)
+    ax.text(-1.8, title_y, "【上游供應】\n(異常風險)", ha="center", fontsize=14, fontweight="bold")
+    ax.text(0.0, title_y, "【核心目標】", ha="center", fontsize=14, fontweight="bold", color="red")
+    ax.text(1.8, title_y, "【下游需求】\n(異常風險)", ha="center", fontsize=14, fontweight="bold")
+
+    cbar = plt.colorbar(nodes, ax=ax, fraction=0.03, pad=0.04)
+    cbar.set_label("GNN 異常機率", rotation=270, labelpad=20)
+
+    ax.set_xlim(-2.6, 2.6)
+    ax.set_ylim(-title_y - 1, title_y + 1)
+    ax.axis("off")
+    plt.title(f"GNN 金融供應鏈異常偵測圖譜（{infer_result['date']}）", fontsize=18, pad=40)
+
+    buf = io.BytesIO()
+    plt.savefig(buf, format="png", bbox_inches="tight", dpi=120)
+    buf.seek(0)
+    plt.close(fig)
     return base64.b64encode(buf.getvalue()).decode()
 
-# --- 修正後的分析路由 ---
-@app.route('/analyze_individual/<symbol>')
-def analyze_individual(symbol):
-    # 增加：從 Query String 獲取名稱
-    name = request.args.get('name', '該股票') 
-    
-    # 修正：將名稱也放進 Prompt 裡，防止 AI 認錯代號
-    prompt = f"分析台股「{name} ({symbol})」。它目前與供應鏈群體出現背離，請以金融分析師身份提供 100 字繁體中文診斷。不准用星號。"
-    
+
+def generate_group_report(infer_result):
+    top = infer_result["nodes"][0]
+    prompt = f"""
+請用繁體中文，以金融分析師口吻，根據以下 GNN 推論結果寫 100~150 字摘要。
+不要用星號。
+
+目標股：{infer_result['target_symbol']}
+日期：{infer_result['date']}
+最高風險節點：{top['name']} ({top['symbol']})
+角色：{top['role']}
+GNN 異常機率：{top['score']:.3f}
+
+請解釋這代表什麼、可能的供應鏈意義、使用者該注意什麼。
+""".strip()
+
     try:
-        import time; time.sleep(1) 
-        resp = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
-        return jsonify({"report": resp.text.strip().replace('*', '')})
-    except Exception as e:
-        if "429" in str(e):
-            return jsonify({"report": "【流量限制】AI 診斷太過頻繁，請等待 12 秒後再試一次。"}), 429
+        resp = client.models.generate_content(model=GEMINI_MODEL, contents=prompt)
+        return resp.text.strip().replace("*", "")
+    except Exception:
+        return "GNN 已偵測到高風險節點，但暫時無法生成 AI 摘要。"
+
+
+@app.route("/analyze_individual/<symbol>")
+def analyze_individual(symbol):
+    name = request.args.get("name", "該股票")
+    prompt = f"""
+請用繁體中文，以金融分析師身份分析台股 {name} ({symbol})。
+字數 100 字左右，不要用星號。
+請從供應鏈位置、近期風險、可能市場解讀三個角度簡短說明。
+""".strip()
+
+    try:
+        time.sleep(1)
+        resp = client.models.generate_content(model=GEMINI_MODEL, contents=prompt)
+        return jsonify({"report": resp.text.strip().replace("*", "")})
+    except Exception:
         return jsonify({"report": "分析暫時無法生成。"}), 500
 
-@app.route('/', methods=['GET', 'POST'])
-def index():
-    report, plot_url, stocks_info = None, None, []
-    if request.method == 'POST':
-        target = request.form.get('symbol').strip().upper()
-        if "." not in target: target += ".TW"
-        
-        stocks_list, names_list, roles_list = discover_stocks(target)
-        res = run_gnn_full_analysis(stocks_list, names_list)
-        
-        if res and res[0]:
-            v_names, v_symbols, scores, features, corr_matrix = res
-            v_roles = []
-            clean_stocks_list = [s.split('.')[0] for s in stocks_list]
-            
-            # --- 增加：核心代號強制匹配邏輯 (Fail-safe) ---
-            # 將輸入的 target 預處理，去除可能的後綴（例：2330.TW -> 2330）
-            input_target_clean = target.split('.')[0].upper() 
-            
-            for s in v_symbols:
-                clean_s = s.split('.')[0]
-                
-                # --- [修正核心問題的地方] ---
-                if clean_s == input_target_clean:
-                    # 強制設定為核心目標角色，不論 AI 先前給了什麼
-                    v_roles.append("目標") 
-                elif clean_s in clean_stocks_list:
-                    idx = clean_stocks_list.index(clean_s)
-                    v_roles.append(roles_list[idx])
-                else:
-                    v_roles.append("其他")
-            
-            plot_url = get_plot_url(v_names, v_symbols, scores, v_roles, corr_matrix)
-            stocks_info = list(zip(v_symbols, v_names))
-            
-            # --- 診斷邏輯：只針對顯著異常生成報告 ---
-            max_score = torch.max(scores).item()
-            if max_score > 0.5:
-                max_idx = torch.argmax(scores).item()
-                target_name = v_names[max_idx]
-                prompt = f"分析對象：{target_name} ({v_symbols[max_idx]})。該股離群指數達 {max_score:.2f}。請以金融分析師身份提供 100 字診斷讓使用者知道目前股價跟今日走勢合不合理。不准使用星號。"
-                try:
-                    resp = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
-                    report = resp.text.strip().replace('*', '')
-                except:
-                    report = "偵測到顯著異常，但 AI 頻率受限。請參考圖譜紅點。"
-            else:
-                report = "今日供應鏈群體聯動穩定，未偵測到顯著背離風險（所有節點離群值均低於 0.5）。"
-        else:
-            report = "數據不足，無法建立圖譜。"
-            
-    return render_template('index.html', report=report, plot_url=plot_url, stocks_info=stocks_info)
 
-if __name__ == '__main__':
+@app.route("/", methods=["GET", "POST"])
+def index():
+    report = None
+    plot_url = None
+    stocks_info = []
+
+    if request.method == "POST":
+        target = request.form.get("symbol", "").strip().upper()
+        if not target:
+            report = "請輸入股票代號。"
+            return render_template("index.html", report=report, plot_url=plot_url, stocks_info=stocks_info)
+
+        if "." not in target:
+            target += ".TW"
+
+        try:
+            infer_result = run_inference(target)
+            plot_url = build_plot_url(infer_result)
+            report = generate_group_report(infer_result)
+            stocks_info = [(n["symbol"], n["name"]) for n in infer_result["nodes"]]
+        except Exception as e:
+            report = f"推論失敗：{str(e)}"
+
+    return render_template("index.html", report=report, plot_url=plot_url, stocks_info=stocks_info)
+
+
+if __name__ == "__main__":
     app.run(port=5000, debug=True)

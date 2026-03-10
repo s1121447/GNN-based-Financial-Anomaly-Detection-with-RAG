@@ -1,0 +1,122 @@
+{
+  "target_symbol": "2454.TW",
+  "nodes": [
+    {
+      "symbol": "2454.TW",
+      "name": "聯發科",
+      "role": "目標"
+    },
+    {
+      "symbol": "2330.TW",
+      "name": "台積電",
+      "role": "上游"
+    },
+    {
+      "symbol": "3711.TW",
+      "name": "日月光投控",
+      "role": "上游"
+    },
+    {
+      "symbol": "2444.TW",
+      "name": "京元電",
+      "role": "上游"
+    },
+    {
+      "symbol": "3443.TW",
+      "name": "創意",
+      "role": "上游"
+    },
+    {
+      "symbol": "3035.TW",
+      "name": "智原",
+      "role": "上游"
+    },
+    {
+      "symbol": "2317.TW",
+      "name": "鴻海",
+      "role": "下游"
+    },
+    {
+      "symbol": "4938.TW",
+      "name": "和碩",
+      "role": "下游"
+    },
+    {
+      "symbol": "2324.TW",
+      "name": "仁寶",
+      "role": "下游"
+    },
+    {
+      "symbol": "3231.TW",
+      "name": "緯創",
+      "role": "下游"
+    },
+    {
+      "symbol": "2357.TW",
+      "name": "華碩",
+      "role": "下游"
+    },
+    {
+      "symbol": "2332.TW",
+      "name": "友訊",
+      "role": "下游"
+    }
+  ],
+  "edges": [
+    {
+      "source": "2330.TW",
+      "target": "2454.TW",
+      "relation": "上游供應"
+    },
+    {
+      "source": "3711.TW",
+      "target": "2454.TW",
+      "relation": "上游供應"
+    },
+    {
+      "source": "2444.TW",
+      "target": "2454.TW",
+      "relation": "上游供應"
+    },
+    {
+      "source": "3443.TW",
+      "target": "2454.TW",
+      "relation": "上游供應"
+    },
+    {
+      "source": "3035.TW",
+      "target": "2454.TW",
+      "relation": "上游供應"
+    },
+    {
+      "source": "2454.TW",
+      "target": "2317.TW",
+      "relation": "下游需求"
+    },
+    {
+      "source": "2454.TW",
+      "target": "4938.TW",
+      "relation": "下游需求"
+    },
+    {
+      "source": "2454.TW",
+      "target": "2324.TW",
+      "relation": "下游需求"
+    },
+    {
+      "source": "2454.TW",
+      "target": "3231.TW",
+      "relation": "下游需求"
+    },
+    {
+      "source": "2454.TW",
+      "target": "2357.TW",
+      "relation": "下游需求"
+    },
+    {
+      "source": "2454.TW",
+      "target": "2332.TW",
+      "relation": "下游需求"
+    }
+  ]
+}

@@ -1,0 +1,132 @@
+{
+  "target_symbol": "2330.TW",
+  "nodes": [
+    {
+      "symbol": "2330.TW",
+      "name": "台積電",
+      "role": "目標"
+    },
+    {
+      "symbol": "3680.TWO",
+      "name": "家登",
+      "role": "上游"
+    },
+    {
+      "symbol": "5434.TW",
+      "name": "崇越",
+      "role": "上游"
+    },
+    {
+      "symbol": "6196.TW",
+      "name": "帆宣",
+      "role": "上游"
+    },
+    {
+      "symbol": "3131.TW",
+      "name": "弘塑",
+      "role": "上游"
+    },
+    {
+      "symbol": "2404.TW",
+      "name": "漢唐",
+      "role": "上游"
+    },
+    {
+      "symbol": "2338.TW",
+      "name": "光罩",
+      "role": "上游"
+    },
+    {
+      "symbol": "6488.TW",
+      "name": "環球晶",
+      "role": "上游"
+    },
+    {
+      "symbol": "2454.TW",
+      "name": "聯發科",
+      "role": "下游"
+    },
+    {
+      "symbol": "3034.TW",
+      "name": "聯詠",
+      "role": "下游"
+    },
+    {
+      "symbol": "2379.TW",
+      "name": "瑞昱",
+      "role": "下游"
+    },
+    {
+      "symbol": "3443.TW",
+      "name": "創意",
+      "role": "下游"
+    },
+    {
+      "symbol": "3661.TW",
+      "name": "世芯-KY",
+      "role": "下游"
+    }
+  ],
+  "edges": [
+    {
+      "source": "3680.TWO",
+      "target": "2330.TW",
+      "relation": "上游供應"
+    },
+    {
+      "source": "5434.TW",
+      "target": "2330.TW",
+      "relation": "上游供應"
+    },
+    {
+      "source": "6196.TW",
+      "target": "2330.TW",
+      "relation": "上游供應"
+    },
+    {
+      "source": "3131.TW",
+      "target": "2330.TW",
+      "relation": "上游供應"
+    },
+    {
+      "source": "2404.TW",
+      "target": "2330.TW",
+      "relation": "上游供應"
+    },
+    {
+      "source": "2338.TW",
+      "target": "2330.TW",
+      "relation": "上游供應"
+    },
+    {
+      "source": "6488.TW",
+      "target": "2330.TW",
+      "relation": "上游供應"
+    },
+    {
+      "source": "2330.TW",
+      "target": "2454.TW",
+      "relation": "下游需求"
+    },
+    {
+      "source": "2330.TW",
+      "target": "3034.TW",
+      "relation": "下游需求"
+    },
+    {
+      "source": "2330.TW",
+      "target": "2379.TW",
+      "relation": "下游需求"
+    },
+    {
+      "source": "2330.TW",
+      "target": "3443.TW",
+      "relation": "下游需求"
+    },
+    {
+      "source": "2330.TW",
+      "target": "3661.TW",
+      "relation": "下游需求"
+    }
+  ]
+}
