@@ -13,6 +13,7 @@ from google import genai
 from inference import run_inference
 from config import GEMINI_MODEL
 
+RISK_THRESHOLD = 0.50
 load_dotenv()
 app = Flask(__name__)
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
@@ -32,7 +33,14 @@ def build_plot_url(infer_result):
     G = nx.DiGraph()
     for i, (symbol, name, role) in enumerate(zip(raw_symbols, raw_names, raw_roles)):
         score = score_map[(symbol, name)]
-        G.add_node(i, symbol=symbol, name=name, role=role, score=score, label=f"{name}\n({symbol})")
+        G.add_node(
+            i,
+            symbol=symbol,
+            name=name,
+            role=role,
+            score=score,
+            label=f"{name}\n({symbol})\n{score:.3f}"
+        )
 
     symbol_to_idx = {s: i for i, s in enumerate(raw_symbols)}
     for e in edge_meta:
@@ -72,6 +80,9 @@ def build_plot_url(infer_result):
 
     if max_y < 3:
         max_y = 3
+    print("=== GNN node scores ===")
+    for n in infer_result["nodes"]:
+        print(n["name"], n["symbol"], n["role"], round(n["score"], 4))
 
     remaining = list(G.nodes())
     node_colors = [G.nodes[i]["score"] for i in remaining]
@@ -127,6 +138,7 @@ def build_plot_url(infer_result):
 
     cbar = plt.colorbar(nodes, ax=ax, fraction=0.03, pad=0.04)
     cbar.set_label("GNN 異常機率", rotation=270, labelpad=20)
+    cbar.set_ticks([0.0, 0.2, 0.4, 0.6, 0.8, 1.0])
 
     ax.set_xlim(-2.6, 2.6)
     ax.set_ylim(-title_y - 1, title_y + 1)
@@ -184,12 +196,19 @@ def index():
     report = None
     plot_url = None
     stocks_info = []
+    risk_table = []
 
     if request.method == "POST":
         target = request.form.get("symbol", "").strip().upper()
         if not target:
             report = "請輸入股票代號。"
-            return render_template("index.html", report=report, plot_url=plot_url, stocks_info=stocks_info)
+            return render_template(
+                "index.html",
+                report=report,
+                plot_url=plot_url,
+                stocks_info=stocks_info,
+                risk_table=risk_table
+            )
 
         if "." not in target:
             target += ".TW"
@@ -199,10 +218,23 @@ def index():
             plot_url = build_plot_url(infer_result)
             report = generate_group_report(infer_result)
             stocks_info = [(n["symbol"], n["name"]) for n in infer_result["nodes"]]
+
+            risk_table = []
+            for item in infer_result["nodes"]:
+                enriched = item.copy()
+                enriched["risk_label"] = "高風險" if item["score"] >= RISK_THRESHOLD else "一般"
+                risk_table.append(enriched)
+
         except Exception as e:
             report = f"推論失敗：{str(e)}"
 
-    return render_template("index.html", report=report, plot_url=plot_url, stocks_info=stocks_info)
+    return render_template(
+        "index.html",
+        report=report,
+        plot_url=plot_url,
+        stocks_info=stocks_info,
+        risk_table=risk_table
+    )
 
 
 if __name__ == "__main__":

@@ -74,7 +74,9 @@ def build_feature_store(symbols, period="2y") -> Tuple[Dict[str, pd.DataFrame], 
         final_symbol, df = download_stock_df(symbol, period=period)
         if df is None:
             continue
-        feature_store[final_symbol] = build_feature_frame(df)
+
+        feat_df = build_feature_frame(df)
+        feature_store[final_symbol] = feat_df
         raw_store[final_symbol] = df.copy()
 
     return feature_store, raw_store

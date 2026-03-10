@@ -84,6 +84,34 @@
             <h3 id="report-title">🔍 AI 自動化診斷報告</h3>
             <p id="report-content">{{ report }}</p>
         </div>
+
+        {% if risk_table %}
+            <h2 style="margin-top:40px;">節點風險排序表</h2>
+            <table style="width:100%; border-collapse: collapse; margin-top: 15px;">
+                <thead>
+                    <tr style="background:#f8d7da;">
+                        <th style="padding:10px; border:1px solid #ddd;">排名</th>
+                        <th style="padding:10px; border:1px solid #ddd;">公司</th>
+                        <th style="padding:10px; border:1px solid #ddd;">代號</th>
+                        <th style="padding:10px; border:1px solid #ddd;">角色</th>
+                        <th style="padding:10px; border:1px solid #ddd;">異常機率</th>
+                        <th style="padding:10px; border:1px solid #ddd;">風險判定</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in risk_table %}
+                    <tr>
+                        <td style="padding:10px; border:1px solid #ddd;">{{ loop.index }}</td>
+                        <td style="padding:10px; border:1px solid #ddd;">{{ item.name }}</td>
+                        <td style="padding:10px; border:1px solid #ddd;">{{ item.symbol }}</td>
+                        <td style="padding:10px; border:1px solid #ddd;">{{ item.role }}</td>
+                        <td style="padding:10px; border:1px solid #ddd;">{{ "%.3f"|format(item.score) }}</td>
+                        <td style="padding:10px; border:1px solid #ddd;">{{ item.risk_label }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
     {% elif report %}
         <div class="report-box">
             <p>{{ report }}</p>

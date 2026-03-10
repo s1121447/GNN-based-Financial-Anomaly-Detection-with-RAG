@@ -2,14 +2,16 @@ import os
 import torch
 from torch_geometric.data import Data
 from graph_builder import discover_supply_chain_graph
-from feature_builder import build_feature_store, future_drawdown_label
+from feature_builder import build_feature_store, future_drawdown_label, recent_edge_correlation
 from config import (
     DATASET_CACHE_DIR,
     FEATURE_COLUMNS,
     LOOKBACK_PERIOD,
     LABEL_HORIZON_DAYS,
     ANOMALY_THRESHOLD,
-    MIN_COMMON_DATES
+    MIN_COMMON_DATES,
+    CORR_EDGE_THRESHOLD,
+    CORR_EDGE_WINDOW
 )
 
 
@@ -69,12 +71,13 @@ def build_single_target_dataset(target_symbol: str):
     edge_pairs = []
     for e in real_edges:
         edge_pairs.append([node_to_idx[e["source"]], node_to_idx[e["target"]]])
-
+        
     if edge_pairs:
         edge_index = torch.tensor(edge_pairs, dtype=torch.long).t().contiguous()
     else:
         edge_index = torch.empty((2, 0), dtype=torch.long)
 
+    print(f"[{target_symbol}] 節點數 = {len(real_nodes)}, 邊數 = {edge_index.shape[1]}")
     dataset = []
 
     for dt in common_dates:

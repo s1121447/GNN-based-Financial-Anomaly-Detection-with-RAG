@@ -7,6 +7,8 @@ from google import genai
 
 from config import GRAPH_CACHE_DIR, GEMINI_MODEL
 
+KB_PATH = "knowledge_base.json"
+
 load_dotenv()
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
@@ -40,7 +42,7 @@ def _extract_json(text: str) -> dict:
         return json.loads(match.group(0))
 
 
-def build_edges_from_nodes(nodes: List[Dict]) -> List[Dict]:
+def build_edges_from_nodes(nodes):
     edges = []
     target_nodes = [n for n in nodes if n["role"] == "目標"]
     if not target_nodes:
@@ -51,6 +53,7 @@ def build_edges_from_nodes(nodes: List[Dict]) -> List[Dict]:
     for node in nodes:
         if node["symbol"] == target_symbol:
             continue
+
         if node["role"] == "上游":
             edges.append({
                 "source": node["symbol"],
@@ -63,6 +66,7 @@ def build_edges_from_nodes(nodes: List[Dict]) -> List[Dict]:
                 "target": node["symbol"],
                 "relation": "下游需求"
             })
+
     return edges
 
 
